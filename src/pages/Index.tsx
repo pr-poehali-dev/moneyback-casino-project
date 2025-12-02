@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,8 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import AuthModal from '@/components/AuthModal';
+import LiveChat from '@/components/LiveChat';
 
 export default function Index() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(true);
+  const [username, setUsername] = useState('');
   const [activeTab, setActiveTab] = useState('home');
   const [balance, setBalance] = useState(5000);
   const [level, setLevel] = useState(12);
@@ -34,6 +39,38 @@ export default function Index() {
   const [todayBets, setTodayBets] = useState(2340);
   
   const [promoCode, setPromoCode] = useState('');
+
+  const [rouletteBet, setRouletteBet] = useState(100);
+  const [rouletteColor, setRouletteColor] = useState<'red' | 'black' | 'green'>('red');
+  const [rouletteResult, setRouletteResult] = useState<number | null>(null);
+  const [rouletteSpinning, setRouletteSpinning] = useState(false);
+
+  const [slotsBet, setSlotsBet] = useState(100);
+  const [slotsReels, setSlotsReels] = useState(['🍒', '🍋', '🍇']);
+  const [slotsSpinning, setSlotsSpinning] = useState(false);
+
+  useEffect(() => {
+    const savedAuth = localStorage.getItem('casino_auth');
+    if (savedAuth) {
+      const data = JSON.parse(savedAuth);
+      setIsAuthenticated(true);
+      setUsername(data.username);
+      setShowAuthModal(false);
+    }
+  }, []);
+
+  const handleLogin = (user: string) => {
+    setUsername(user);
+    setIsAuthenticated(true);
+    localStorage.setItem('casino_auth', JSON.stringify({ username: user }));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUsername('');
+    localStorage.removeItem('casino_auth');
+    setShowAuthModal(true);
+  };
 
   const playDice = () => {
     if (diceBet > balance) return;
@@ -98,6 +135,86 @@ export default function Index() {
     } else {
       alert('Неверный промокод');
     }
+  };
+
+  const playRoulette = () => {
+    if (rouletteBet > balance) return;
+    
+    setRouletteSpinning(true);
+    setBalance(balance - rouletteBet);
+    
+    setTimeout(() => {
+      const result = Math.floor(Math.random() * 37);
+      setRouletteResult(result);
+      
+      let won = false;
+      if (result === 0 && rouletteColor === 'green') {
+        won = true;
+        setBalance(balance + rouletteBet * 14);
+      } else if (result > 0) {
+        const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+        const isRed = redNumbers.includes(result);
+        
+        if ((isRed && rouletteColor === 'red') || (!isRed && rouletteColor === 'black')) {
+          won = true;
+          setBalance(balance + rouletteBet);
+        }
+      }
+      
+      setXp(xp + (won ? 15 : 5));
+      setTodayBets(todayBets + rouletteBet);
+      setRouletteSpinning(false);
+    }, 3000);
+  };
+
+  const playSlots = () => {
+    if (slotsBet > balance) return;
+    
+    setSlotsSpinning(true);
+    setBalance(balance - slotsBet);
+    
+    const symbols = ['🍒', '🍋', '🍇', '💎', '7️⃣', '🍀', '⭐', '🔔'];
+    
+    const interval = setInterval(() => {
+      setSlotsReels([
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)]
+      ]);
+    }, 100);
+    
+    setTimeout(() => {
+      clearInterval(interval);
+      
+      const finalReels = [
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)]
+      ];
+      
+      setSlotsReels(finalReels);
+      
+      if (finalReels[0] === finalReels[1] && finalReels[1] === finalReels[2]) {
+        const multipliers: Record<string, number> = {
+          '7️⃣': 10,
+          '💎': 8,
+          '⭐': 6,
+          '🔔': 5,
+          '🍀': 4,
+          '🍒': 3,
+          '🍋': 3,
+          '🍇': 3
+        };
+        const multiplier = multipliers[finalReels[0]] || 3;
+        setBalance(balance + slotsBet * multiplier);
+        setXp(xp + 20);
+      } else {
+        setXp(xp + 5);
+      }
+      
+      setTodayBets(todayBets + slotsBet);
+      setSlotsSpinning(false);
+    }, 2000);
   };
 
   const renderNavigation = () => (
@@ -202,6 +319,28 @@ export default function Index() {
             <h3 className="font-semibold text-center">Mines</h3>
             <p className="text-xs text-muted-foreground text-center mt-1">Сапёр</p>
           </Card>
+
+          <Card 
+            className="p-6 cursor-pointer hover:scale-105 transition-transform gradient-card border-destructive/20"
+            onClick={() => setActiveTab('games')}
+          >
+            <div className="bg-red-500/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+              <Icon name="CircleDot" size={32} className="text-red-500" />
+            </div>
+            <h3 className="font-semibold text-center">Рулетка</h3>
+            <p className="text-xs text-muted-foreground text-center mt-1">Красное/Черное</p>
+          </Card>
+
+          <Card 
+            className="p-6 cursor-pointer hover:scale-105 transition-transform gradient-card border-accent/20"
+            onClick={() => setActiveTab('games')}
+          >
+            <div className="bg-accent/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-4 mx-auto">
+              <Icon name="cherry" size={32} className="text-accent" fallback="Sparkles" />
+            </div>
+            <h3 className="font-semibold text-center">Слоты</h3>
+            <p className="text-xs text-muted-foreground text-center mt-1">Джекпот</p>
+          </Card>
         </div>
       </div>
 
@@ -227,10 +366,16 @@ export default function Index() {
 
   const renderGames = () => (
     <div className="space-y-6 pb-24 animate-fade-in">
-      <h1 className="text-3xl font-bold">Игры</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Игры</h1>
+        <Badge variant="outline" className="gap-1">
+          <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+          {Math.floor(Math.random() * 500) + 200} играют
+        </Badge>
+      </div>
       
       <Tabs defaultValue="dice" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="dice" className="data-[state=active]:glow-primary">
             <Icon name="Dices" size={18} />
             Dice
@@ -238,6 +383,14 @@ export default function Index() {
           <TabsTrigger value="mines" className="data-[state=active]:glow-danger">
             <Icon name="Bomb" size={18} />
             Mines
+          </TabsTrigger>
+          <TabsTrigger value="roulette" className="data-[state=active]:glow-danger">
+            <Icon name="CircleDot" size={18} />
+            Рулетка
+          </TabsTrigger>
+          <TabsTrigger value="slots" className="data-[state=active]:glow-success">
+            <Icon name="Sparkles" size={18} />
+            Слоты
           </TabsTrigger>
         </TabsList>
 
@@ -387,7 +540,183 @@ export default function Index() {
             )}
           </Card>
         </TabsContent>
+
+        <TabsContent value="roulette" className="space-y-4">
+          <Card className="p-6 gradient-card border-destructive/20">
+            <h3 className="text-xl font-bold mb-4">🎰 Рулетка</h3>
+            
+            <div className="space-y-6">
+              <div>
+                <Label className="text-sm mb-2 block">Ставка</Label>
+                <Input
+                  type="number"
+                  value={rouletteBet}
+                  onChange={(e) => setRouletteBet(Number(e.target.value))}
+                  className="text-lg font-semibold"
+                  min={10}
+                  max={balance}
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm mb-2 block">Выбери цвет</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <Button
+                    variant={rouletteColor === 'red' ? 'default' : 'outline'}
+                    className={`h-16 ${rouletteColor === 'red' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                    onClick={() => setRouletteColor('red')}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">Красное</div>
+                      <div className="text-xs">x2</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant={rouletteColor === 'black' ? 'default' : 'outline'}
+                    className={`h-16 ${rouletteColor === 'black' ? 'bg-gray-900 hover:bg-black' : ''}`}
+                    onClick={() => setRouletteColor('black')}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">Черное</div>
+                      <div className="text-xs">x2</div>
+                    </div>
+                  </Button>
+                  <Button
+                    variant={rouletteColor === 'green' ? 'default' : 'outline'}
+                    className={`h-16 ${rouletteColor === 'green' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                    onClick={() => setRouletteColor('green')}
+                  >
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">Зеро</div>
+                      <div className="text-xs">x14</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+
+              {rouletteResult !== null && !rouletteSpinning && (
+                <Card className={`p-6 text-center ${
+                  (rouletteResult === 0 && rouletteColor === 'green') ||
+                  (rouletteResult > 0 && [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'red') ||
+                  (rouletteResult > 0 && ![1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'black')
+                    ? 'bg-accent/20 border-accent'
+                    : 'bg-destructive/20 border-destructive'
+                }`}>
+                  <div className="text-6xl font-bold mb-2">{rouletteResult}</div>
+                  <div className={`text-xl font-semibold ${
+                    (rouletteResult === 0 && rouletteColor === 'green') ||
+                    (rouletteResult > 0 && [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'red') ||
+                    (rouletteResult > 0 && ![1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'black')
+                      ? 'text-accent'
+                      : 'text-destructive'
+                  }`}>
+                    {(rouletteResult === 0 && rouletteColor === 'green') ||
+                     (rouletteResult > 0 && [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'red') ||
+                     (rouletteResult > 0 && ![1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(rouletteResult) && rouletteColor === 'black')
+                      ? '🎉 Победа!'
+                      : '💔 Проигрыш'}
+                  </div>
+                </Card>
+              )}
+
+              {rouletteSpinning && (
+                <Card className="p-6 text-center bg-primary/20 border-primary">
+                  <div className="text-6xl font-bold mb-2 animate-pulse">🎰</div>
+                  <div className="text-xl font-semibold text-primary">Вращается...</div>
+                </Card>
+              )}
+
+              <Button 
+                onClick={playRoulette}
+                className="w-full h-14 text-lg font-bold bg-red-600 hover:bg-red-700"
+                disabled={rouletteBet > balance || rouletteBet < 10 || rouletteSpinning}
+              >
+                <Icon name="Play" size={24} />
+                {rouletteSpinning ? 'Крутится...' : 'Крутить'}
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="slots" className="space-y-4">
+          <Card className="p-6 gradient-card border-accent/20">
+            <h3 className="text-xl font-bold mb-4">🎰 Слоты</h3>
+            
+            <div className="space-y-6">
+              <div>
+                <Label className="text-sm mb-2 block">Ставка</Label>
+                <Input
+                  type="number"
+                  value={slotsBet}
+                  onChange={(e) => setSlotsBet(Number(e.target.value))}
+                  className="text-lg font-semibold"
+                  min={10}
+                  max={balance}
+                />
+              </div>
+
+              <Card className="p-8 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/50">
+                <div className="flex justify-center gap-4 mb-4">
+                  {slotsReels.map((symbol, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-24 h-24 bg-secondary rounded-xl flex items-center justify-center text-5xl ${
+                        slotsSpinning ? 'animate-pulse' : ''
+                      }`}
+                    >
+                      {symbol}
+                    </div>
+                  ))}
+                </div>
+
+                {slotsReels[0] === slotsReels[1] && slotsReels[1] === slotsReels[2] && !slotsSpinning && (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-accent mb-2">🎉 ДЖЕКПОТ! 🎉</div>
+                    <div className="text-sm text-muted-foreground">
+                      {slotsReels[0] === '7️⃣' && 'x10 множитель!'}
+                      {slotsReels[0] === '💎' && 'x8 множитель!'}
+                      {slotsReels[0] === '⭐' && 'x6 множитель!'}
+                      {!['7️⃣', '💎', '⭐'].includes(slotsReels[0]) && 'x3 множитель!'}
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              <div className="bg-secondary/50 p-4 rounded-xl">
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div className="flex justify-between">
+                    <span>7️⃣ 7️⃣ 7️⃣</span>
+                    <span className="font-semibold text-accent">x10</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>💎 💎 💎</span>
+                    <span className="font-semibold text-accent">x8</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>⭐ ⭐ ⭐</span>
+                    <span className="font-semibold text-accent">x6</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Другие комбо</span>
+                    <span className="font-semibold text-accent">x3-5</span>
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                onClick={playSlots}
+                className="w-full h-14 text-lg font-bold gradient-success"
+                disabled={slotsBet > balance || slotsBet < 10 || slotsSpinning}
+              >
+                <Icon name="Play" size={24} />
+                {slotsSpinning ? 'Крутится...' : 'Крутить'}
+              </Button>
+            </div>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <LiveChat username={username} />
     </div>
   );
 
@@ -697,6 +1026,12 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <AuthModal 
+        open={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        onLogin={handleLogin}
+      />
+
       <div className="max-w-6xl mx-auto p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -705,12 +1040,26 @@ export default function Index() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">MONEY-BACK</h1>
-              <p className="text-sm text-muted-foreground">Online Casino</p>
+              <p className="text-sm text-muted-foreground">
+                {isAuthenticated ? `Привет, ${username}!` : 'Online Casino'}
+              </p>
             </div>
           </div>
-          <Button variant="outline" size="icon" className="rounded-full">
-            <Icon name="Bell" size={20} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full"
+                onClick={handleLogout}
+              >
+                <Icon name="LogOut" size={20} />
+              </Button>
+            )}
+            <Button variant="outline" size="icon" className="rounded-full">
+              <Icon name="Bell" size={20} />
+            </Button>
+          </div>
         </div>
 
         {activeTab === 'home' && renderHome()}
